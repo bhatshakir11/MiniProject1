@@ -1,21 +1,29 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
+import axios from "axios";
+import API_BASE_URL from "../config";
 
 const NotesPage = () => {
-  const [notes, setNotes] = useState([
-    { id: 1, title: "Bank PIN", content: "1234 (encrypted)" },
-    { id: 2, title: "WiFi Password", content: "mywifipass (encrypted)" },
-  ]);
+  const [notes, setNotes] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title: "", content: "" });
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/notes`).then(res => {
+      setNotes(res.data);
+    });
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
-    setNotes([...notes, { ...form, id: Date.now() }]);
+    await axios.post(`${API_BASE_URL}/notes`, form);
+    const res = await axios.get(`${API_BASE_URL}/notes`);
+    setNotes(res.data);
     setShowAdd(false);
     setForm({ title: "", content: "" });
   };

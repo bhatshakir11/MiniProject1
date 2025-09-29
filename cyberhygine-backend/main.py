@@ -6,7 +6,6 @@ import sqlite3
 import bcrypt
 
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,6 +13,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Notes Support ---
+class Note(BaseModel):
+    title: str
+    content: str
+
+def ensure_notes_table():
+    conn = sqlite3.connect("users.db")
+    conn.execute("""CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL
+    )""")
+    conn.close()
+
+@app.post("/api/notes")
+def add_note(note: Note):
+    ensure_notes_table()
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO notes (title, content) VALUES (?, ?)", (note.title, note.content))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/api/notes")
+def get_notes():
+    ensure_notes_table()
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, content FROM notes")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "title": r[1], "content": r[2]} for r in rows]
+
 
 class Credential(BaseModel):
     site: str
