@@ -25,6 +25,10 @@ const VaultPage = () => {
   const [form, setForm] = useState({ site: "", username: "", password: "", strength: "medium" });
   const [zxcvbnResult, setZxcvbnResult] = useState(zxcvbn(""));
   const [error, setError] = useState("");
+  const [removingId, setRemovingId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ site: "", username: "", password: "", strength: "medium" });
+  const [editZxcvbnResult, setEditZxcvbnResult] = useState(zxcvbn(""));
 
   useEffect(() => {
     // Fetch credentials from backend
@@ -33,6 +37,60 @@ const VaultPage = () => {
     });
   }, []);
 
+  const handleRemove = async (id) => {
+    setRemovingId(id);
+    setError("");
+    try {
+      await axios.delete(`${API_BASE_URL}/credentials/${id}`);
+      // Refresh credentials list
+      const res = await axios.get(`${API_BASE_URL}/credentials`);
+      setCredentials(res.data);
+    } catch (err) {
+      setError("Failed to remove credential.");
+    }
+    setRemovingId(null);
+  };
+
+    const handleEditClick = (cred) => {
+      setEditingId(cred.id);
+      setEditForm({
+        site: cred.site,
+        username: cred.username,
+        password: cred.password,
+        strength: cred.strength
+      });
+      setEditZxcvbnResult(zxcvbn(cred.password));
+      setError("");
+    };
+
+    const handleEditChange = (e) => {
+      const { name, value } = e.target;
+      let updatedForm = { ...editForm, [name]: value };
+      if (name === "password") {
+        const result = zxcvbn(value);
+        updatedForm.strength = getPasswordStrength(value);
+        setEditZxcvbnResult(result);
+      }
+      setEditForm(updatedForm);
+    };
+
+    const handleEditSave = async (id) => {
+      setError("");
+      try {
+        await axios.put(`${API_BASE_URL}/credentials/${id}`, editForm);
+        // Refresh credentials list
+        const res = await axios.get(`${API_BASE_URL}/credentials`);
+        setCredentials(res.data);
+        setEditingId(null);
+      } catch (err) {
+        setError("Failed to update credential.");
+      }
+    };
+
+    const handleEditCancel = () => {
+      setEditingId(null);
+      setError("");
+    };
   const handleChange = (e) => {
     const { name, value } = e.target;
     let updatedForm = { ...form, [name]: value };
@@ -114,17 +172,86 @@ const VaultPage = () => {
                 <th className="text-left">Username</th>
                 <th className="text-left">Password</th>
                 <th className="text-left">Strength</th>
+                <th className="text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
               {credentials.map((cred) => (
                 <tr key={cred.id} className="border-b border-white/20">
-                  <td>{cred.site}</td>
-                  <td>{cred.username}</td>
-                  <td>{cred.password}</td>
-                  <td>
-                    <span className={`px-2 py-1 rounded text-xs ${cred.strength === "strong" ? "bg-green-600" : cred.strength === "medium" ? "bg-yellow-600" : "bg-red-600"}`}>{cred.strength}</span>
-                  </td>
+                  {editingId === cred.id ? (
+                    <>
+                      <td>
+                        <input
+                          name="site"
+                          value={editForm.site}
+                          onChange={handleEditChange}
+                          className="w-full px-2 py-1 rounded bg-white/20 text-white"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          name="username"
+                          value={editForm.username}
+                          onChange={handleEditChange}
+                          className="w-full px-2 py-1 rounded bg-white/20 text-white"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          name="password"
+                          value={editForm.password}
+                          onChange={handleEditChange}
+                          className="w-full px-2 py-1 rounded bg-white/20 text-white"
+                        />
+                        <div className="mt-1">
+                          <div className="w-full h-1 rounded bg-gray-700">
+                            <div className={`h-1 rounded ${strengthColors[editForm.strength]}`} style={{ width: `${(editZxcvbnResult.score + 1) * 20}%` }}></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`px-2 py-1 rounded text-xs ${strengthColors[editForm.strength]}`}>{editForm.strength}</span>
+                      </td>
+                      <td>
+                        <button
+                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mr-2"
+                          onClick={() => handleEditSave(cred.id)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded"
+                          onClick={handleEditCancel}
+                        >
+                          Cancel
+                        </button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{cred.site}</td>
+                      <td>{cred.username}</td>
+                      <td>{cred.password}</td>
+                      <td>
+                        <span className={`px-2 py-1 rounded text-xs ${cred.strength === "strong" ? "bg-green-600" : cred.strength === "medium" ? "bg-yellow-600" : "bg-red-600"}`}>{cred.strength}</span>
+                      </td>
+                      <td>
+                        <button
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mr-2"
+                          onClick={() => handleEditClick(cred)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
+                          onClick={() => handleRemove(cred.id)}
+                          disabled={removingId === cred.id}
+                        >
+                          {removingId === cred.id ? "Removing..." : "Remove"}
+                        </button>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
