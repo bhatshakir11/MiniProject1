@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import AnimatedBackground from "../components/AnimatedBackground";
 import API_BASE_URL from "../config";
 
 const LoginPage = () => {
@@ -27,26 +28,27 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-blue-900">
-      <div className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg p-8 w-full max-w-md">
-        <h2 className="text-3xl font-bold text-center text-white mb-6">Sign In</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+      <AnimatedBackground />
+      <div className="glass-card rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10 animate-fade-in">
+        <h2 className="text-4xl font-bold text-center bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent mb-8">Sign In</h2>
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label className="block text-white mb-1">Username</label>
+            <label className="block text-cyan-300 font-semibold mb-2">Username</label>
             <input
               type="text"
-              className="w-full px-4 py-2 rounded bg-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
             />
           </div>
           <div className="mb-4">
-            <label className="block text-white mb-1">Password</label>
+            <label className="block text-cyan-300 font-semibold mb-2">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full px-4 py-2 rounded bg-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -64,15 +66,15 @@ const LoginPage = () => {
           {error && <div className="text-red-400 mb-2 text-center">{error}</div>}
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded transition"
+            className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold py-3 rounded-lg btn-futuristic shadow-lg transition-all"
           >
             Login
           </button>
         </form>
         <div className="text-center mt-4">
-          <span className="text-white">Don't have an account?</span>
+          <span className="text-gray-300">Don't have an account?</span>
           <button
-            className="ml-2 text-blue-300 hover:underline"
+            className="ml-2 text-cyan-400 hover:text-cyan-300 transition-colors"
             onClick={() => navigate("/register")}
           >
             Register

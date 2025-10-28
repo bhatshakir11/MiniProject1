@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import AnimatedBackground from "../components/AnimatedBackground";
 import axios from "axios";
 import API_BASE_URL from "../config";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
@@ -72,13 +73,14 @@ const DashboardPage = () => {
   if (tips.length === 0) tips.push("Your vault is in excellent shape!");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-blue-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+      <AnimatedBackground />
       <Navbar />
-      <div className="max-w-5xl mx-auto py-8 px-4">
-        <h2 className="text-3xl font-bold text-white mb-6">Dashboard</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-white/10 rounded-xl p-6 shadow text-center">
-            <h3 className="text-lg text-white mb-2">Cyber Hygiene Score</h3>
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 relative z-10">
+        <h2 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent mb-8 animate-fade-in">Dashboard</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="glass-card rounded-2xl p-6 text-center animate-fade-in" style={{animationDelay: '0.1s'}}>
+            <h3 className="text-lg font-semibold text-cyan-300 mb-4">Cyber Hygiene Score</h3>
             <div className="flex flex-col items-center">
               <PieChart width={180} height={180}>
                 <Pie
@@ -95,11 +97,11 @@ const DashboardPage = () => {
                   <Cell key="rest" fill="#22223b" />
                 </Pie>
               </PieChart>
-              <span className="text-3xl font-bold text-white mt-2">{hygieneScore}%</span>
+              <span className="text-4xl font-bold bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent mt-2">{hygieneScore}%</span>
             </div>
           </div>
-          <div className="bg-white/10 rounded-xl p-6 shadow">
-            <h3 className="text-lg text-white mb-2">Password Strength</h3>
+          <div className="glass-card rounded-2xl p-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
+            <h3 className="text-lg font-semibold text-cyan-300 mb-4">Password Strength</h3>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={passwordStats}>
                 <XAxis dataKey="name" stroke="#fff" />
@@ -115,9 +117,9 @@ const DashboardPage = () => {
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-          <div className="bg-white/10 rounded-xl p-6 shadow">
-            <h3 className="text-lg text-white mb-2">Reused vs Unique Passwords</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mt-6 lg:mt-8">
+          <div className="glass-card rounded-2xl p-6 animate-fade-in" style={{animationDelay: '0.3s'}}>
+            <h3 className="text-lg font-semibold text-cyan-300 mb-4">Reused vs Unique Passwords</h3>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie
@@ -138,17 +140,17 @@ const DashboardPage = () => {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="bg-white/10 rounded-xl p-6 shadow flex flex-col justify-center items-center">
-            <h3 className="text-lg text-white mb-2">Reminders & Alerts</h3>
-            <ul className="text-white mb-2">
+          <div className="glass-card rounded-2xl p-6 flex flex-col justify-center animate-fade-in" style={{animationDelay: '0.4s'}}>
+            <h3 className="text-lg font-semibold text-cyan-300 mb-4">Reminders & Alerts</h3>
+            <ul className="text-gray-200 mb-4 space-y-2">
               {reminders.map((rem, idx) => (
-                <li key={idx}>{rem}</li>
+                <li key={idx} className="flex items-start"><span className="text-cyan-400 mr-2">•</span>{rem}</li>
               ))}
             </ul>
-            <h4 className="text-md text-blue-300 mb-1">Tips:</h4>
-            <ul className="text-blue-200">
+            <h4 className="text-md font-semibold text-cyan-300 mb-2 mt-4">Tips:</h4>
+            <ul className="text-gray-300 space-y-2">
               {tips.map((tip, idx) => (
-                <li key={idx}>{tip}</li>
+                <li key={idx} className="flex items-start"><span className="text-blue-400 mr-2">→</span>{tip}</li>
               ))}
             </ul>
           </div>

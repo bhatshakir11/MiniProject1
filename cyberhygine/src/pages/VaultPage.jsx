@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
+import AnimatedBackground from "../components/AnimatedBackground";
 import zxcvbn from "zxcvbn";
 import axios from "axios";
 import API_BASE_URL from "../config";
@@ -119,29 +120,30 @@ const VaultPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-blue-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+      <AnimatedBackground />
       <Navbar />
-      <div className="max-w-3xl mx-auto py-8 px-4">
-        <h2 className="text-3xl font-bold text-white mb-6">Password Vault</h2>
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 relative z-10">
+        <h2 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent mb-8 animate-fade-in">Password Vault</h2>
         <button
-          className="mb-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+          className="mb-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-3 rounded-lg btn-futuristic shadow-lg transition-all"
           onClick={() => setShowAdd(true)}
         >
           Add Credential
         </button>
         {showAdd && (
-          <form onSubmit={handleAdd} className="bg-white/10 rounded-xl p-6 mb-6">
+          <form onSubmit={handleAdd} className="glass-card rounded-2xl p-6 mb-6 animate-fade-in">
             <div className="mb-4">
-              <label className="block text-white mb-1">Site</label>
-              <input name="site" value={form.site} onChange={handleChange} required className="w-full px-3 py-2 rounded bg-white/20 text-white" />
+              <label className="block text-cyan-300 font-semibold mb-2">Site</label>
+              <input name="site" value={form.site} onChange={handleChange} required className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all" />
             </div>
             <div className="mb-4">
-              <label className="block text-white mb-1">Username</label>
-              <input name="username" value={form.username} onChange={handleChange} required className="w-full px-3 py-2 rounded bg-white/20 text-white" />
+              <label className="block text-cyan-300 font-semibold mb-2">Username</label>
+              <input name="username" value={form.username} onChange={handleChange} required className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all" />
             </div>
             <div className="mb-4">
-              <label className="block text-white mb-1">Password</label>
-              <input name="password" value={form.password} onChange={handleChange} required className="w-full px-3 py-2 rounded bg-white/20 text-white" />
+              <label className="block text-cyan-300 font-semibold mb-2">Password</label>
+              <input name="password" value={form.password} onChange={handleChange} required className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all" />
               {/* Strength bar and feedback */}
               <div className="mt-2">
                 <div className="w-full h-2 rounded bg-gray-700">
@@ -156,28 +158,28 @@ const VaultPage = () => {
               </div>
             </div>
             <div className="mb-4">
-              <label className="block text-white mb-1">Strength</label>
+              <label className="block text-cyan-300 font-semibold mb-2">Strength</label>
               <span className={`px-2 py-1 rounded text-xs ${strengthColors[form.strength]}`}>{form.strength}</span>
             </div>
             {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Save</button>
-            <button type="button" className="ml-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded" onClick={() => setShowAdd(false)}>Cancel</button>
+            <button type="submit" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-lg btn-futuristic shadow-lg transition-all">Save</button>
+            <button type="button" className="ml-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-6 py-3 rounded-lg btn-futuristic shadow-lg transition-all" onClick={() => setShowAdd(false)}>Cancel</button>
           </form>
         )}
-        <div className="bg-white/10 rounded-xl p-6">
-          <table className="w-full text-white">
+        <div className="glass-card rounded-2xl p-6 animate-fade-in overflow-x-auto">
+          <table className="w-full text-white min-w-[800px]">
             <thead>
               <tr>
-                <th className="text-left">Site</th>
-                <th className="text-left">Username</th>
-                <th className="text-left">Password</th>
-                <th className="text-left">Strength</th>
-                <th className="text-left">Actions</th>
+                <th className="text-left text-cyan-300 font-semibold pb-4">Site</th>
+                <th className="text-left text-cyan-300 font-semibold pb-4">Username</th>
+                <th className="text-left text-cyan-300 font-semibold pb-4">Password</th>
+                <th className="text-left text-cyan-300 font-semibold pb-4">Strength</th>
+                <th className="text-left text-cyan-300 font-semibold pb-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {credentials.map((cred) => (
-                <tr key={cred.id} className="border-b border-white/20">
+                <tr key={cred.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
                   {editingId === cred.id ? (
                     <>
                       <td>
@@ -185,7 +187,7 @@ const VaultPage = () => {
                           name="site"
                           value={editForm.site}
                           onChange={handleEditChange}
-                          className="w-full px-2 py-1 rounded bg-white/20 text-white"
+                          className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all"
                         />
                       </td>
                       <td>
@@ -193,7 +195,7 @@ const VaultPage = () => {
                           name="username"
                           value={editForm.username}
                           onChange={handleEditChange}
-                          className="w-full px-2 py-1 rounded bg-white/20 text-white"
+                          className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all"
                         />
                       </td>
                       <td>
@@ -201,7 +203,7 @@ const VaultPage = () => {
                           name="password"
                           value={editForm.password}
                           onChange={handleEditChange}
-                          className="w-full px-2 py-1 rounded bg-white/20 text-white"
+                          className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400 transition-all"
                         />
                         <div className="mt-1">
                           <div className="w-full h-1 rounded bg-gray-700">
@@ -214,13 +216,13 @@ const VaultPage = () => {
                       </td>
                       <td>
                         <button
-                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded mr-2"
+                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-3 py-2 rounded-lg btn-futuristic shadow-md transition-all mr-2"
                           onClick={() => handleEditSave(cred.id)}
                         >
                           Save
                         </button>
                         <button
-                          className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded"
+                          className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-2 rounded-lg btn-futuristic shadow-md transition-all"
                           onClick={handleEditCancel}
                         >
                           Cancel
@@ -237,13 +239,13 @@ const VaultPage = () => {
                       </td>
                       <td>
                         <button
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded mr-2"
+                          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-3 py-2 rounded-lg btn-futuristic shadow-md transition-all mr-2"
                           onClick={() => handleEditClick(cred)}
                         >
                           Edit
                         </button>
                         <button
-                          className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
+                          className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-3 py-2 rounded-lg btn-futuristic shadow-md transition-all"
                           onClick={() => handleRemove(cred.id)}
                           disabled={removingId === cred.id}
                         >

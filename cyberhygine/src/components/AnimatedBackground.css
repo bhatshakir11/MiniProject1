@@ -1,0 +1,34 @@
+.animated-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.paint-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.3;
+  animation: float 20s infinite ease-in-out;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -50px) scale(1.1); }
+  50% { transform: translate(-20px, -80px) scale(0.9); }
+  75% { transform: translate(-40px, -30px) scale(1.05); }
+}
+
+.blob-1 { width: 300px; height: 300px; background: #00C49F; top: 10%; left: 10%; animation-delay: 0s; animation-duration: 18s; }
+.blob-2 { width: 250px; height: 250px; background: #4A90E2; top: 60%; left: 70%; animation-delay: 2s; animation-duration: 22s; }
+.blob-3 { width: 200px; height: 200px; background: #9B59B6; top: 30%; left: 80%; animation-delay: 4s; animation-duration: 20s; }
+.blob-4 { width: 280px; height: 280px; background: #FF8042; top: 70%; left: 20%; animation-delay: 6s; animation-duration: 24s; }
+.blob-5 { width: 220px; height: 220px; background: #FFD600; top: 50%; left: 50%; animation-delay: 8s; animation-duration: 19s; }
+.blob-6 { width: 260px; height: 260px; background: #E74C3C; top: 20%; left: 40%; animation-delay: 10s; animation-duration: 21s; }
+.blob-7 { width: 240px; height: 240px; background: #3498DB; top: 80%; left: 60%; animation-delay: 12s; animation-duration: 23s; }
+.blob-8 { width: 210px; height: 210px; background: #1ABC9C; top: 40%; left: 15%; animation-delay: 14s; animation-duration: 25s; }
