@@ -10,7 +10,8 @@ const NotesPage = () => {
   const [form, setForm] = useState({ title: "", content: "" });
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/notes`).then(res => {
+    const userId = localStorage.getItem("user_id");
+    axios.get(`${API_BASE_URL}/notes?user_id=${userId}`).then(res => {
       setNotes(res.data);
     });
   }, []);
@@ -21,8 +22,9 @@ const NotesPage = () => {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    await axios.post(`${API_BASE_URL}/notes`, form);
-    const res = await axios.get(`${API_BASE_URL}/notes`);
+    const userId = localStorage.getItem("user_id");
+    await axios.post(`${API_BASE_URL}/notes?user_id=${userId}`, form);
+    const res = await axios.get(`${API_BASE_URL}/notes?user_id=${userId}`);
     setNotes(res.data);
     setShowAdd(false);
     setForm({ title: "", content: "" });

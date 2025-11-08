@@ -35,7 +35,8 @@ const VaultPage = () => {
   const [showEditPassword, setShowEditPassword] = useState({});
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/credentials`).then(res => {
+    const userId = localStorage.getItem("user_id");
+    axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`).then(res => {
       setCredentials(res.data);
     });
   }, []);
@@ -43,9 +44,10 @@ const VaultPage = () => {
   const handleRemove = async (id) => {
     setRemovingId(id);
     setError("");
+    const userId = localStorage.getItem("user_id");
     try {
-      await axios.delete(`${API_BASE_URL}/credentials/${id}`);
-      const res = await axios.get(`${API_BASE_URL}/credentials`);
+      await axios.delete(`${API_BASE_URL}/credentials/${id}?user_id=${userId}`);
+      const res = await axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`);
       setCredentials(res.data);
     } catch (err) {
       setError("Failed to remove credential.");
@@ -78,9 +80,10 @@ const VaultPage = () => {
 
   const handleEditSave = async (id) => {
     setError("");
+    const userId = localStorage.getItem("user_id");
     try {
-      await axios.put(`${API_BASE_URL}/credentials/${id}`, editForm);
-      const res = await axios.get(`${API_BASE_URL}/credentials`);
+      await axios.put(`${API_BASE_URL}/credentials/${id}?user_id=${userId}`, editForm);
+      const res = await axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`);
       setCredentials(res.data);
       setEditingId(null);
     } catch (err) {
@@ -107,9 +110,10 @@ const VaultPage = () => {
   const handleAdd = async (e) => {
     e.preventDefault();
     setError("");
+    const userId = localStorage.getItem("user_id");
     try {
-      await axios.post(`${API_BASE_URL}/credentials`, form);
-      const res = await axios.get(`${API_BASE_URL}/credentials`);
+      await axios.post(`${API_BASE_URL}/credentials?user_id=${userId}`, form);
+      const res = await axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`);
       setCredentials(res.data);
       setShowAdd(false);
       setForm({ site: "", username: "", password: "", strength: "medium" });

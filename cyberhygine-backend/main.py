@@ -25,27 +25,29 @@ def ensure_notes_table():
     conn = sqlite3.connect("users.db")
     conn.execute("""CREATE TABLE IF NOT EXISTS notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
         title TEXT NOT NULL,
-        content TEXT NOT NULL
+        content TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
     )""")
     conn.close()
 
 @app.post("/api/notes")
-def add_note(note: Note):
+def add_note(note: Note, user_id: int):
     ensure_notes_table()
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO notes (title, content) VALUES (?, ?)", (note.title, note.content))
+    cursor.execute("INSERT INTO notes (user_id, title, content) VALUES (?, ?, ?)", (user_id, note.title, note.content))
     conn.commit()
     conn.close()
     return {"success": True}
 
 @app.get("/api/notes")
-def get_notes():
+def get_notes(user_id: int):
     ensure_notes_table()
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT id, title, content FROM notes")
+    cursor.execute("SELECT id, title, content FROM notes WHERE user_id = ?", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     return [{"id": r[0], "title": r[1], "content": r[2]} for r in rows]
@@ -59,14 +61,14 @@ class Credential(BaseModel):
 
 # Update credential
 @app.put("/api/credentials/{cred_id}")
-def update_credential(cred_id: int, cred: Credential):
+def update_credential(cred_id: int, cred: Credential, user_id: int):
     conn = get_cred_db()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE credentials
         SET site = ?, username = ?, password = ?, strength = ?
-        WHERE id = ?
-    """, (cred.site, cred.username, cred.password, cred.strength, cred_id))
+        WHERE id = ? AND user_id = ?
+    """, (cred.site, cred.username, cred.password, cred.strength, cred_id, user_id))
     conn.commit()
     affected = cursor.rowcount
     conn.close()
@@ -82,30 +84,32 @@ def get_cred_db():
     conn = sqlite3.connect("users.db")
     conn.execute("""CREATE TABLE IF NOT EXISTS credentials (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
         site TEXT NOT NULL,
         username TEXT NOT NULL,
         password TEXT NOT NULL,
-        strength TEXT NOT NULL
+        strength TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
     )""")
     return conn
 
 # Add credential
 @app.post("/api/credentials")
-def add_credential(cred: Credential):
+def add_credential(cred: Credential, user_id: int):
     conn = get_cred_db()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO credentials (site, username, password, strength) VALUES (?, ?, ?, ?)",
-                   (cred.site, cred.username, cred.password, cred.strength))
+    cursor.execute("INSERT INTO credentials (user_id, site, username, password, strength) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, cred.site, cred.username, cred.password, cred.strength))
     conn.commit()
     conn.close()
     return {"success": True}
 
 # Get all credentials
 @app.get("/api/credentials")
-def get_credentials():
+def get_credentials(user_id: int):
     conn = get_cred_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, site, username, password, strength FROM credentials")
+    cursor.execute("SELECT id, site, username, password, strength FROM credentials WHERE user_id = ?", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     return [{"id": r[0], "site": r[1], "username": r[2], "password": r[3], "strength": r[4]} for r in rows]
@@ -114,10 +118,10 @@ from fastapi import HTTPException
 
 # Delete credential
 @app.delete("/api/credentials/{cred_id}")
-def delete_credential(cred_id: int):
+def delete_credential(cred_id: int, user_id: int):
     conn = get_cred_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM credentials WHERE id = ?", (cred_id,))
+    cursor.execute("DELETE FROM credentials WHERE id = ? AND user_id = ?", (cred_id, user_id))
     conn.commit()
     affected = cursor.rowcount
     conn.close()
@@ -127,11 +131,11 @@ def delete_credential(cred_id: int):
 
 # Dashboard stats
 @app.get("/api/dashboard")
-def dashboard_stats():
+def dashboard_stats(user_id: int):
     conn = get_cred_db()
     cursor = conn.cursor()
     # Password strength stats
-    cursor.execute("SELECT strength, COUNT(*) FROM credentials GROUP BY strength")
+    cursor.execute("SELECT strength, COUNT(*) FROM credentials WHERE user_id = ? GROUP BY strength", (user_id,))
     strength_counts = {row[0]: row[1] for row in cursor.fetchall()}
     strong = strength_counts.get("strong", 0)
     weak = strength_counts.get("weak", 0)
@@ -140,7 +144,7 @@ def dashboard_stats():
     score = int((strong / total) * 100) if total > 0 else 0
 
     # Reused vs Unique passwords
-    cursor.execute("SELECT password, COUNT(*) as cnt FROM credentials GROUP BY password")
+    cursor.execute("SELECT password, COUNT(*) as cnt FROM credentials WHERE user_id = ? GROUP BY password", (user_id,))
     reused = 0
     unique = 0
     for row in cursor.fetchall():
@@ -193,14 +197,13 @@ def register(user: UserRegister):
 def login(user: UserLogin):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE username=?", (user.username,))
+    cursor.execute("SELECT id, password_hash FROM users WHERE username=?", (user.username,))
     row = cursor.fetchone()
     conn.close()
     if not row:
         return {"success": False, "message": "Invalid username or password"}
-    if bcrypt.checkpw(user.password.encode(), row[0]):
-        # In production, return a JWT token here
-        return {"success": True, "token": "dummy-token"}
+    if bcrypt.checkpw(user.password.encode(), row[1]):
+        return {"success": True, "token": str(row[0]), "user_id": row[0]}
     return {"success": False, "message": "Invalid username or password"}
 
 from fastapi.responses import StreamingResponse
@@ -213,7 +216,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.charts.piecharts import Pie
 
-def generate_pdf_report():
+def generate_pdf_report(user_id):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
@@ -224,7 +227,7 @@ def generate_pdf_report():
     story.append(Spacer(1, 12))
 
     # Password Strength Stats
-    stats = dashboard_stats()
+    stats = dashboard_stats(user_id)
     story.append(Paragraph("Password Strength", styles['h2']))
     story.append(Paragraph(f"Strong: {stats['strong']}", styles['Normal']))
     story.append(Paragraph(f"Medium: {stats['medium']}", styles['Normal']))
@@ -254,7 +257,7 @@ def generate_pdf_report():
 
     # Credentials Table
     story.append(Paragraph("Stored Credentials", styles['h2']))
-    credentials = get_credentials()
+    credentials = get_credentials(user_id)
     if credentials:
         table_data = [['Site', 'Username', 'Password', 'Strength']]
         for cred in credentials:
@@ -279,7 +282,7 @@ def generate_pdf_report():
     return buffer
 
 @app.get("/api/report")
-def get_report():
-    pdf_buffer = generate_pdf_report()
+def get_report(user_id: int):
+    pdf_buffer = generate_pdf_report(user_id)
     return StreamingResponse(pdf_buffer, media_type='application/pdf', headers={'Content-Disposition': 'attachment; filename=report.pdf'})
 

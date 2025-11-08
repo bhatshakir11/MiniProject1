@@ -18,6 +18,7 @@ const LoginPage = () => {
       const res = await axios.post(`${API_BASE_URL}/login`, { username, password });
       if (res.data.success) {
         localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user_id", res.data.user_id);
         navigate("/dashboard");
       } else {
         setError(res.data.message || "Invalid credentials");

@@ -4,8 +4,8 @@ import AnimatedBackground from "../components/AnimatedBackground";
 
 const ReportsPage = () => {
   const handleDownload = () => {
-    // Replace with actual API call to download PDF
-    window.open("http://localhost:8000/api/report", "_blank");
+    const userId = localStorage.getItem("user_id");
+    window.open(`http://localhost:8000/api/report?user_id=${userId}`, "_blank");
   };
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">

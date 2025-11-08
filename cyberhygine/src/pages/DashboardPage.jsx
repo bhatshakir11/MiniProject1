@@ -17,10 +17,11 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const fetchStats = () => {
-      axios.get(`${API_BASE_URL}/dashboard`).then(res => {
+      const userId = localStorage.getItem("user_id");
+      axios.get(`${API_BASE_URL}/dashboard?user_id=${userId}`).then(res => {
         setStats(res.data);
       });
-      axios.get(`${API_BASE_URL}/credentials`).then(res => {
+      axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`).then(res => {
         setCredentials(res.data);
       });
     };
