@@ -72,6 +72,12 @@ body {
   animation: fadeInUp 0.6s ease-out forwards;
 }
 
+/* Prevent descender clipping (g/y/p) on gradient-clipped text in some browsers. */
+.bg-clip-text.text-transparent {
+  line-height: 1.2;
+  padding-bottom: 0.08em;
+}
+
 html.dark body {
   background: #000000;
 }

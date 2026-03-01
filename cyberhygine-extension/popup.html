@@ -1,0 +1,247 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Cyber Hygiene</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --text: #e6edf3;
+        --muted: #9ba7b4;
+        --accent: #00b5d8;
+        --ok: #14f195;
+        --warn: #f5c542;
+        --err: #ff6b6b;
+        --border: #2d333b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        width: 360px;
+        min-height: 420px;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: linear-gradient(180deg, #0b0f15 0%, #0d1117 55%, #111827 100%);
+        color: var(--text);
+      }
+
+      .container {
+        padding: 14px;
+      }
+
+      .header {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: var(--accent);
+      }
+
+      .panel {
+        background: rgba(22, 27, 34, 0.9);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 10px;
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .domain {
+        font-weight: 700;
+        font-size: 13px;
+        color: #7dd3fc;
+        text-align: right;
+        max-width: 210px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .status {
+        min-height: 36px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        font-size: 12px;
+        line-height: 1.4;
+        margin-bottom: 10px;
+      }
+
+      .status.info {
+        color: #c9d1d9;
+        background: rgba(96, 165, 250, 0.1);
+        border-color: rgba(96, 165, 250, 0.3);
+      }
+
+      .status.success {
+        color: #d1fae5;
+        background: rgba(16, 185, 129, 0.12);
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+
+      .status.warn {
+        color: #fff7cc;
+        background: rgba(245, 197, 66, 0.12);
+        border-color: rgba(245, 197, 66, 0.35);
+      }
+
+      .status.error {
+        color: #ffe2e2;
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .loader {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 10px;
+      }
+
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid #2b3645;
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .field {
+        margin-bottom: 10px;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      select {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0b1220;
+        color: var(--text);
+        padding: 8px;
+        outline: none;
+      }
+
+      .actions {
+        display: grid;
+        gap: 8px;
+      }
+
+      button {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 10px 12px;
+        cursor: pointer;
+        color: white;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      button:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: linear-gradient(90deg, #0284c7, #06b6d4);
+      }
+
+      .btn-login {
+        background: linear-gradient(90deg, #2563eb, #0ea5e9);
+      }
+
+      .btn-secondary {
+        background: #1f2937;
+        border-color: #374151;
+      }
+
+      .btn-danger {
+        background: linear-gradient(90deg, #b91c1c, #ef4444);
+      }
+
+      .footer {
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">Cyber Hygiene</div>
+
+      <div class="panel">
+        <div class="row">
+          <span class="label">Domain</span>
+          <span id="domainValue" class="domain">-</span>
+        </div>
+      </div>
+
+      <div id="status" class="status info">Checking authentication...</div>
+
+      <div id="loading" class="loader hidden">
+        <span class="spinner"></span>
+        <span>Loading credentials...</span>
+      </div>
+
+      <div id="credentialsSection" class="panel hidden">
+        <div class="field">
+          <label for="credentialSelect">Saved account</label>
+          <select id="credentialSelect"></select>
+        </div>
+        <div class="actions">
+          <button id="autofillBtn" class="btn-primary">Autofill</button>
+        </div>
+      </div>
+
+      <div id="emptySection" class="panel hidden">
+        <div class="label">No credentials found for this domain.</div>
+      </div>
+
+      <div class="actions">
+        <button id="loginBtn" class="btn-login hidden">Login to Cyber Hygiene</button>
+        <button id="syncBtn" class="btn-secondary hidden">Sync Login Session</button>
+        <button id="neverBtn" class="btn-secondary hidden"></button>
+        <button id="refreshBtn" class="btn-secondary">Refresh</button>
+      </div>
+
+      <div class="footer">Exact domain matching is required before autofill.</div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

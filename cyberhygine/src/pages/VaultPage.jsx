@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import AnimatedBackground from "../components/AnimatedBackground";
 import zxcvbn from "zxcvbn";
-import axios from "axios";
-import API_BASE_URL from "../config";
+import apiClient from "../apiClient";
 
 // Password strength checker using zxcvbn
 function getPasswordStrength(password) {
@@ -35,8 +34,7 @@ const VaultPage = () => {
   const [showEditPassword, setShowEditPassword] = useState({});
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`).then(res => {
+    apiClient.get("/credentials").then((res) => {
       setCredentials(res.data);
     });
   }, []);
@@ -44,10 +42,9 @@ const VaultPage = () => {
   const handleRemove = async (id) => {
     setRemovingId(id);
     setError("");
-    const userId = localStorage.getItem("user_id");
     try {
-      await axios.delete(`${API_BASE_URL}/credentials/${id}?user_id=${userId}`);
-      const res = await axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`);
+      await apiClient.delete(`/credentials/${id}`);
+      const res = await apiClient.get("/credentials");
       setCredentials(res.data);
     } catch (err) {
       setError("Failed to remove credential.");
@@ -80,10 +77,9 @@ const VaultPage = () => {
 
   const handleEditSave = async (id) => {
     setError("");
-    const userId = localStorage.getItem("user_id");
     try {
-      await axios.put(`${API_BASE_URL}/credentials/${id}?user_id=${userId}`, editForm);
-      const res = await axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`);
+      await apiClient.put(`/credentials/${id}`, editForm);
+      const res = await apiClient.get("/credentials");
       setCredentials(res.data);
       setEditingId(null);
     } catch (err) {
@@ -110,10 +106,9 @@ const VaultPage = () => {
   const handleAdd = async (e) => {
     e.preventDefault();
     setError("");
-    const userId = localStorage.getItem("user_id");
     try {
-      await axios.post(`${API_BASE_URL}/credentials?user_id=${userId}`, form);
-      const res = await axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`);
+      await apiClient.post("/credentials", form);
+      const res = await apiClient.get("/credentials");
       setCredentials(res.data);
       setShowAdd(false);
       setForm({ site: "", username: "", password: "", strength: "medium" });

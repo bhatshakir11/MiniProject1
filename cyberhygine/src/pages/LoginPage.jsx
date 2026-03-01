@@ -2,14 +2,34 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import AnimatedBackground from "../components/AnimatedBackground";
+import apiClient from "../apiClient";
 import API_BASE_URL from "../config";
+import { loginWithFingerprint, registerFingerprint, supportsWebAuthn } from "../utils/webauthn";
 
 const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [fingerprintLoading, setFingerprintLoading] = useState(false);
   const navigate = useNavigate();
+
+  const maybePromptFingerprintRegistration = async () => {
+    if (!supportsWebAuthn()) return;
+    try {
+      const statusRes = await apiClient.get("/fingerprints/status");
+      if (statusRes.data?.has_fingerprint) return;
+      const consent = window.confirm(
+        "Would you like to register fingerprint/Windows Hello login now?"
+      );
+      if (!consent) return;
+      await registerFingerprint();
+      alert("Fingerprint login is enabled.");
+    } catch (err) {
+      console.error(err);
+      alert("Logged in, but fingerprint registration failed. You can try again after login.");
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -18,13 +38,37 @@ const LoginPage = () => {
       const res = await axios.post(`${API_BASE_URL}/login`, { username, password });
       if (res.data.success) {
         localStorage.setItem("token", res.data.token);
-        localStorage.setItem("user_id", res.data.user_id);
+        localStorage.removeItem("user_id");
+        await maybePromptFingerprintRegistration();
         navigate("/dashboard");
       } else {
         setError(res.data.message || "Invalid credentials");
       }
     } catch (err) {
       setError("Login failed. Please try again.");
+    }
+  };
+
+  const handleFingerprintLogin = async () => {
+    setError("");
+    if (!supportsWebAuthn()) {
+      setError("Fingerprint login is not supported in this browser.");
+      return;
+    }
+    setFingerprintLoading(true);
+    try {
+      const res = await loginWithFingerprint();
+      if (res.success) {
+        localStorage.setItem("token", res.token);
+        localStorage.removeItem("user_id");
+        navigate("/dashboard");
+      } else {
+        setError(res.message || "Fingerprint login failed.");
+      }
+    } catch (err) {
+      setError("Fingerprint login failed. Try password login first.");
+    } finally {
+      setFingerprintLoading(false);
     }
   };
 
@@ -71,7 +115,18 @@ const LoginPage = () => {
           >
             Login
           </button>
+          <button
+            type="button"
+            onClick={handleFingerprintLogin}
+            disabled={fingerprintLoading}
+            className="w-full mt-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold py-3 rounded-lg btn-futuristic shadow-lg transition-all disabled:opacity-50"
+          >
+            {fingerprintLoading ? "Waiting for fingerprint..." : "Login with Fingerprint"}
+          </button>
         </form>
+        <p className="text-xs text-gray-300 text-center mt-3">
+          Supports Windows Hello / fingerprint credentials
+        </p>
         <div className="text-center mt-4">
           <span className="text-gray-300">Don't have an account?</span>
           <button

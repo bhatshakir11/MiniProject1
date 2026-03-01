@@ -1,11 +1,23 @@
 import React from "react";
 import Navbar from "../components/Navbar";
 import AnimatedBackground from "../components/AnimatedBackground";
+import apiClient from "../apiClient";
 
 const ReportsPage = () => {
-  const handleDownload = () => {
-    const userId = localStorage.getItem("user_id");
-    window.open(`http://localhost:8000/api/report?user_id=${userId}`, "_blank");
+  const handleDownload = async () => {
+    try {
+      const res = await apiClient.get("/report", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Failed to download report.");
+    }
   };
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">

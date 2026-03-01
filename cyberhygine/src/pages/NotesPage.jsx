@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import AnimatedBackground from "../components/AnimatedBackground";
-import axios from "axios";
-import API_BASE_URL from "../config";
+import apiClient from "../apiClient";
 
 const NotesPage = () => {
   const [notes, setNotes] = useState([]);
@@ -10,8 +9,7 @@ const NotesPage = () => {
   const [form, setForm] = useState({ title: "", content: "" });
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    axios.get(`${API_BASE_URL}/notes?user_id=${userId}`).then(res => {
+    apiClient.get("/notes").then((res) => {
       setNotes(res.data);
     });
   }, []);
@@ -22,9 +20,8 @@ const NotesPage = () => {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    const userId = localStorage.getItem("user_id");
-    await axios.post(`${API_BASE_URL}/notes?user_id=${userId}`, form);
-    const res = await axios.get(`${API_BASE_URL}/notes?user_id=${userId}`);
+    await apiClient.post("/notes", form);
+    const res = await apiClient.get("/notes");
     setNotes(res.data);
     setShowAdd(false);
     setForm({ title: "", content: "" });

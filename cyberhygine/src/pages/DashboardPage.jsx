@@ -1,27 +1,31 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import AnimatedBackground from "../components/AnimatedBackground";
-import axios from "axios";
-import API_BASE_URL from "../config";
+import apiClient from "../apiClient";
+import { registerFingerprint, supportsWebAuthn } from "../utils/webauthn";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
 const STRENGTH_COLORS = {
-  Strong: "#00C49F",
-  Medium: "#FFD600",
-  Weak: "#FF8042",
+  Strong: "#04c956",
+  Medium: "#e8a11c",
+  Weak: "#f75929",
 };
 
 const DashboardPage = () => {
   const [stats, setStats] = useState({ strong: 0, weak: 0, medium: 0, score: 0, reused: 0, unique: 0 });
   const [credentials, setCredentials] = useState([]);
+  const [fingerprints, setFingerprints] = useState([]);
+  const [fingerprintError, setFingerprintError] = useState("");
+  const [fingerprintSuccess, setFingerprintSuccess] = useState("");
+  const [fingerprintLoading, setFingerprintLoading] = useState(false);
+  const [deletingFingerprintId, setDeletingFingerprintId] = useState("");
 
   useEffect(() => {
     const fetchStats = () => {
-      const userId = localStorage.getItem("user_id");
-      axios.get(`${API_BASE_URL}/dashboard?user_id=${userId}`).then(res => {
+      apiClient.get("/dashboard").then((res) => {
         setStats(res.data);
       });
-      axios.get(`${API_BASE_URL}/credentials?user_id=${userId}`).then(res => {
+      apiClient.get("/credentials").then((res) => {
         setCredentials(res.data);
       });
     };
@@ -29,6 +33,56 @@ const DashboardPage = () => {
     const interval = setInterval(fetchStats, 2000); // Poll every 2s for real-time updates
     return () => clearInterval(interval);
   }, []);
+
+  const fetchFingerprints = async () => {
+    try {
+      const res = await apiClient.get("/fingerprints");
+      setFingerprints(res.data.fingerprints || []);
+      setFingerprintError("");
+    } catch (err) {
+      setFingerprintError("Failed to load fingerprints.");
+    }
+  };
+
+  useEffect(() => {
+    fetchFingerprints();
+  }, []);
+
+  const handleAddFingerprint = async () => {
+    setFingerprintSuccess("");
+    setFingerprintError("");
+    if (!supportsWebAuthn()) {
+      setFingerprintError("Fingerprint login is not supported in this browser.");
+      return;
+    }
+    setFingerprintLoading(true);
+    try {
+      await registerFingerprint();
+      await fetchFingerprints();
+      setFingerprintSuccess("New fingerprint added.");
+    } catch (err) {
+      setFingerprintError("Fingerprint registration failed.");
+    } finally {
+      setFingerprintLoading(false);
+    }
+  };
+
+  const handleDeleteFingerprint = async (credentialId) => {
+    setFingerprintSuccess("");
+    setFingerprintError("");
+    const confirmed = window.confirm("Remove this fingerprint?");
+    if (!confirmed) return;
+    setDeletingFingerprintId(credentialId);
+    try {
+      await apiClient.delete(`/fingerprints/${encodeURIComponent(credentialId)}`);
+      await fetchFingerprints();
+      setFingerprintSuccess("Fingerprint removed.");
+    } catch (err) {
+      setFingerprintError("Failed to remove fingerprint.");
+    } finally {
+      setDeletingFingerprintId("");
+    }
+  };
 
   const hygieneScore = stats.score;
   const passwordStats = [
@@ -154,6 +208,50 @@ const DashboardPage = () => {
                 <li key={idx} className="flex items-start"><span className="text-blue-400 mr-2">→</span>{tip}</li>
               ))}
             </ul>
+          </div>
+        </div>
+        <div className="glass-card rounded-2xl p-6 mt-6 lg:mt-8 animate-fade-in" style={{animationDelay: "0.5s"}}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h3 className="text-lg font-semibold text-cyan-300">Manage Fingerprints</h3>
+            <button
+              onClick={handleAddFingerprint}
+              disabled={fingerprintLoading}
+              className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white px-4 py-2 rounded-lg btn-futuristic shadow-lg transition-all disabled:opacity-50"
+            >
+              {fingerprintLoading ? "Waiting for fingerprint..." : "Add Fingerprint"}
+            </button>
+          </div>
+          <p className="text-gray-300 mt-2 text-sm">
+            Register and manage Windows Hello fingerprint credentials for biometric login.
+          </p>
+          {fingerprintError && <p className="text-red-400 mt-3 text-sm">{fingerprintError}</p>}
+          {fingerprintSuccess && <p className="text-green-400 mt-3 text-sm">{fingerprintSuccess}</p>}
+          <div className="mt-4 space-y-3">
+            {fingerprints.length === 0 && (
+              <p className="text-gray-300 text-sm">No fingerprints registered yet.</p>
+            )}
+            {fingerprints.map((item) => (
+              <div key={item.credential_id} className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-white font-medium">{item.display_id}</p>
+                  <p className="text-xs text-gray-300 mt-1">
+                    Created: {item.created_at || "unknown"} | Sign count: {item.sign_count}
+                  </p>
+                  {item.transports?.length > 0 && (
+                    <p className="text-xs text-cyan-300 mt-1">
+                      Transports: {item.transports.join(", ")}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteFingerprint(item.credential_id)}
+                  disabled={deletingFingerprintId === item.credential_id}
+                  className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg btn-futuristic shadow-lg transition-all disabled:opacity-50"
+                >
+                  {deletingFingerprintId === item.credential_id ? "Removing..." : "Remove"}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>

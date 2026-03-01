@@ -23,7 +23,7 @@
   "build": "react-scripts build",
   "test": "react-scripts test",
   "eject": "react-scripts eject",
-  "start-backend": "cd ../cyberhygine-backend && python -m uvicorn main:app --reload"
+  "start-backend": "cd ../cyberhygine-backend && python -m uvicorn main:app --port 9000"
   },
   "eslintConfig": {
     "extends": [

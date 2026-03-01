@@ -7,9 +7,23 @@ import VaultPage from "./pages/VaultPage";
 import NotesPage from "./pages/NotesPage";
 import ReportsPage from "./pages/ReportsPage";
 
+const isTokenExpired = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp ? Date.now() >= payload.exp * 1000 : false;
+  } catch {
+    return true;
+  }
+};
+
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem("token");
-  return token ? children : <Navigate to="/login" />;
+  if (!token || isTokenExpired(token)) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user_id");
+    return <Navigate to="/login" />;
+  }
+  return children;
 };
 
 function App() {

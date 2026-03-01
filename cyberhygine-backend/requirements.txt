@@ -2,3 +2,5 @@ fastapi
 uvicorn
 bcrypt
 reportlab
+PyJWT
+cryptography
