@@ -3,6 +3,9 @@
   window.__CYBERHYGIENE_CONTENT_READY__ = true;
 
   const TRUSTED_APP_ORIGINS = new Set(["http://localhost:3000", "https://localhost:3000"]);
+  const CAPTURE_DEBOUNCE_MS = 8000;
+  let lastCaptureKey = "";
+  let lastCaptureAt = 0;
 
   const SECOND_LEVEL_SUFFIXES = new Set([
     "co.uk",
@@ -157,6 +160,102 @@
       .sort((a, b) => b.score - a.score);
 
     return candidates.length > 0 ? candidates[0].el : null;
+  }
+
+  function isHttpPage() {
+    return window.location.protocol === "http:" || window.location.protocol === "https:";
+  }
+
+  function isLikelyNewPasswordField(input) {
+    const auto = normalizeString(input.autocomplete).toLowerCase();
+    const name = normalizeString(input.name).toLowerCase();
+    const id = normalizeString(input.id).toLowerCase();
+    const placeholder = normalizeString(input.placeholder).toLowerCase();
+    const hint = `${auto} ${name} ${id} ${placeholder}`;
+    return /new-password|confirm|repeat|otp|one.?time|verification|reset|create|signup|register/.test(
+      hint
+    );
+  }
+
+  function extractSubmittedLoginCredential(form) {
+    const scope = form instanceof HTMLFormElement ? form : document;
+    const passwordInput = findPasswordInput(scope);
+    if (!passwordInput) return null;
+
+    if (isLikelyNewPasswordField(passwordInput)) return null;
+
+    const allPasswordInputs = Array.from(
+      scope.querySelectorAll('input[type="password"]')
+    ).filter(isVisibleInput);
+    if (allPasswordInputs.length > 1 && allPasswordInputs.some(isLikelyNewPasswordField)) {
+      return null;
+    }
+
+    const usernameInput = findUsernameInput(passwordInput);
+    const username = normalizeString(usernameInput && usernameInput.value, 1024);
+    const password = normalizeString(passwordInput.value, 4096);
+
+    if (!username || !password) return null;
+
+    return {
+      username,
+      password
+    };
+  }
+
+  function shouldSkipRecentCapture(domain, username, password) {
+    const key = `${domain}|${username}|${password}`;
+    const now = Date.now();
+    if (lastCaptureKey === key && now - lastCaptureAt < CAPTURE_DEBOUNCE_MS) {
+      return true;
+    }
+    lastCaptureKey = key;
+    lastCaptureAt = now;
+    return false;
+  }
+
+  function sendCapturedCredential(payload) {
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "CAPTURE_LOGIN_CREDENTIAL",
+          domain: payload.domain,
+          site: payload.site,
+          username: payload.username,
+          password: payload.password
+        },
+        () => {
+          void chrome.runtime.lastError;
+        }
+      );
+    } catch {
+      // no-op
+    }
+  }
+
+  function onFormSubmit(event) {
+    if (!isHttpPage()) return;
+    if (isTrustedAppOrigin()) return;
+
+    const form = event.target instanceof HTMLFormElement ? event.target : null;
+    if (!form) return;
+
+    const credential = extractSubmittedLoginCredential(form);
+    if (!credential) return;
+
+    const domain = getCurrentBaseDomain();
+    if (!domain) return;
+
+    if (shouldSkipRecentCapture(domain, credential.username, credential.password)) {
+      return;
+    }
+
+    sendCapturedCredential({
+      domain,
+      site: window.location.hostname || domain,
+      username: credential.username,
+      password: credential.password
+    });
   }
 
   function isTrustedAppOrigin() {
@@ -384,6 +483,8 @@
       message: "Credentials autofilled successfully."
     };
   }
+
+  document.addEventListener("submit", onFormSubmit, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!message || !message.type) return;

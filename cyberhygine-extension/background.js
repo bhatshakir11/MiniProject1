@@ -15,6 +15,7 @@ const MESSAGE = Object.freeze({
   REQUEST_BIOMETRIC_GATE: "REQUEST_BIOMETRIC_GATE",
   FETCH_VAULT_FOR_ACTIVE_TAB: "FETCH_VAULT_FOR_ACTIVE_TAB",
   PERFORM_AUTOFILL: "PERFORM_AUTOFILL",
+  CAPTURE_LOGIN_CREDENTIAL: "CAPTURE_LOGIN_CREDENTIAL",
   SET_NEVER_AUTOFILL: "SET_NEVER_AUTOFILL",
   GET_NEVER_AUTOFILL_STATUS: "GET_NEVER_AUTOFILL_STATUS",
   SET_TOKEN: "SET_TOKEN",
@@ -441,6 +442,53 @@ function maskUsername(username) {
   return `${value.slice(0, 2)}***`;
 }
 
+function estimatePasswordStrength(password) {
+  const value = normalizeString(password, 4096);
+  if (!value) return "weak";
+
+  let score = 0;
+  if (value.length >= 8) score += 1;
+  if (value.length >= 12) score += 1;
+  if (value.length >= 16) score += 1;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+  if (/\d/.test(value)) score += 1;
+  if (/[^A-Za-z0-9]/.test(value)) score += 1;
+
+  if (score <= 2) return "weak";
+  if (score <= 4) return "medium";
+  return "strong";
+}
+
+async function getAuthorizedToken(allowSync = false) {
+  let token = await getToken();
+
+  if (!token && allowSync) {
+    const synced = await trySyncTokenFromAppTabs();
+    if (synced.ok) {
+      token = await getToken();
+    }
+  }
+
+  if (!token) {
+    return {
+      ok: false,
+      code: CODE.NO_TOKEN,
+      message: "Please login to Cyber Hygiene."
+    };
+  }
+
+  if (isJwtExpired(token)) {
+    await clearToken();
+    return {
+      ok: false,
+      code: CODE.UNAUTHORIZED,
+      message: "Session expired. Please login again."
+    };
+  }
+
+  return { ok: true, code: CODE.OK, token };
+}
+
 async function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -516,6 +564,248 @@ async function fetchVaultCredentials(domain, token) {
       message: "Network error while contacting backend."
     };
   }
+}
+
+async function fetchAllStoredCredentials(token) {
+  try {
+    const response = await fetchWithTimeout(
+      `${CONFIG.API_BASE_URL}/credentials`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json"
+        },
+        cache: "no-store"
+      },
+      CONFIG.REQUEST_TIMEOUT_MS
+    );
+
+    if (response.status === 401) {
+      return {
+        ok: false,
+        code: CODE.UNAUTHORIZED,
+        message: "Session expired."
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        code: CODE.API_ERROR,
+        message: `Credentials API error (${response.status}).`
+      };
+    }
+
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      return {
+        ok: false,
+        code: CODE.INVALID_RESPONSE,
+        message: "Invalid JSON response from credentials API."
+      };
+    }
+
+    if (!Array.isArray(payload)) {
+      return {
+        ok: false,
+        code: CODE.INVALID_RESPONSE,
+        message: "Invalid credentials response format."
+      };
+    }
+
+    const credentials = payload
+      .map((record) => {
+        if (!record || typeof record !== "object") return null;
+
+        const id = firstNonEmptyString(record.id, record.credential_id);
+        const username = firstNonEmptyString(record.username, record.email);
+        const domain = getBaseDomain(firstNonEmptyString(record.site, record.domain, record.url));
+
+        if (!id || !username || !domain) return null;
+
+        return {
+          id,
+          username,
+          domain
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      ok: true,
+      code: CODE.OK,
+      credentials
+    };
+  } catch {
+    return {
+      ok: false,
+      code: CODE.NETWORK_ERROR,
+      message: "Network error while contacting backend."
+    };
+  }
+}
+
+async function createStoredCredential(token, credential) {
+  try {
+    const response = await fetchWithTimeout(
+      `${CONFIG.API_BASE_URL}/credentials`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify(credential),
+        cache: "no-store"
+      },
+      CONFIG.REQUEST_TIMEOUT_MS
+    );
+
+    if (response.status === 401) {
+      return {
+        ok: false,
+        code: CODE.UNAUTHORIZED,
+        message: "Session expired."
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        code: CODE.API_ERROR,
+        message: `Credentials API error (${response.status}).`
+      };
+    }
+
+    return {
+      ok: true,
+      code: CODE.OK
+    };
+  } catch {
+    return {
+      ok: false,
+      code: CODE.NETWORK_ERROR,
+      message: "Network error while contacting backend."
+    };
+  }
+}
+
+async function updateStoredCredential(token, credId, credential) {
+  const id = normalizeString(String(credId), 128);
+  if (!id) {
+    return {
+      ok: false,
+      code: CODE.INVALID_RESPONSE,
+      message: "Invalid credential id."
+    };
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${CONFIG.API_BASE_URL}/credentials/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify(credential),
+        cache: "no-store"
+      },
+      CONFIG.REQUEST_TIMEOUT_MS
+    );
+
+    if (response.status === 401) {
+      return {
+        ok: false,
+        code: CODE.UNAUTHORIZED,
+        message: "Session expired."
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        code: CODE.API_ERROR,
+        message: `Credentials API error (${response.status}).`
+      };
+    }
+
+    return {
+      ok: true,
+      code: CODE.OK
+    };
+  } catch {
+    return {
+      ok: false,
+      code: CODE.NETWORK_ERROR,
+      message: "Network error while contacting backend."
+    };
+  }
+}
+
+async function handleCaptureLoginCredential(message) {
+  const username = normalizeString(message && message.username, 1024);
+  const password = normalizeString(message && message.password, 4096);
+  const domain = getBaseDomain(
+    firstNonEmptyString(message && message.domain, message && message.site)
+  );
+
+  if (!domain || !username || !password) {
+    return {
+      ok: false,
+      code: CODE.INVALID_RESPONSE,
+      message: "Invalid captured login payload."
+    };
+  }
+
+  const tokenState = await getAuthorizedToken(true);
+  if (!tokenState.ok) return tokenState;
+
+  const listResult = await fetchAllStoredCredentials(tokenState.token);
+  if (!listResult.ok) {
+    if (listResult.code === CODE.UNAUTHORIZED) {
+      await clearToken();
+    }
+    return listResult;
+  }
+
+  const usernameLower = username.toLowerCase();
+  const existing = listResult.credentials.find(
+    (item) =>
+      item.domain === domain &&
+      normalizeString(item.username, 1024).toLowerCase() === usernameLower
+  );
+
+  const credentialPayload = {
+    site: domain,
+    username,
+    password,
+    strength: estimatePasswordStrength(password)
+  };
+
+  const saveResult = existing
+    ? await updateStoredCredential(tokenState.token, existing.id, credentialPayload)
+    : await createStoredCredential(tokenState.token, credentialPayload);
+
+  if (!saveResult.ok) {
+    if (saveResult.code === CODE.UNAUTHORIZED) {
+      await clearToken();
+    }
+    return saveResult;
+  }
+
+  return {
+    ok: true,
+    code: CODE.OK,
+    saved: true,
+    action: existing ? "updated" : "created"
+  };
 }
 
 function sendMessageToTab(tabId, message) {
@@ -761,6 +1051,15 @@ async function handleMessage(message) {
 
     case MESSAGE.PERFORM_AUTOFILL: {
       return handlePerformAutofill(message);
+    }
+
+    case MESSAGE.CAPTURE_LOGIN_CREDENTIAL: {
+      return handleCaptureLoginCredential(message);
+    }
+    case "SAVE_CREDENTIAL":
+    case "ADD_CREDENTIAL":
+    case "UPSERT_CREDENTIAL": {
+      return handleCaptureLoginCredential(message);
     }
 
     case MESSAGE.SET_NEVER_AUTOFILL: {
