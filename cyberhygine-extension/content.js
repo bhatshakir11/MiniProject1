@@ -368,6 +368,7 @@
 
         const optionsData = await optionsRes.json();
         const requestOptions = toRequestOptions(optionsData.options || {});
+        requestOptions.userVerification = "required";
 
         if (navigator.credentials && typeof navigator.credentials.preventSilentAccess === "function") {
           try {

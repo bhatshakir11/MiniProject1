@@ -4,7 +4,8 @@
   APP_ORIGINS: ["http://localhost:3000", "https://localhost:3000"],
   TOKEN_KEY: "jwt_token",
   NEVER_AUTOFILL_KEY: "never_autofill_domains",
-  REQUEST_TIMEOUT_MS: 10000
+  REQUEST_TIMEOUT_MS: 10000,
+  BIOMETRIC_UNLOCK_TTL_MS: 30000
 });
 
 const MESSAGE = Object.freeze({
@@ -60,6 +61,12 @@ const storageSet = (items) =>
 
 const storageRemove = (keys) =>
   new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
+
+let biometricUnlock = {
+  tabId: null,
+  domain: "",
+  expiresAt: 0
+};
 
 function normalizeString(value, maxLen = 1024) {
   if (typeof value !== "string") return "";
@@ -230,9 +237,16 @@ async function trySyncTokenFromAppTabs() {
   }
 }
 
-async function requestBiometricGateViaAppTab() {
+async function requestBiometricGateViaAppTab(requestMessage) {
+  const targetContext = await getContextForRequest(requestMessage);
+  if (!targetContext.ok) {
+    clearBiometricUnlock();
+    return targetContext;
+  }
+
   const appTab = await findTrustedAppTab();
   if (!appTab || !appTab.id) {
+    clearBiometricUnlock();
     return {
       ok: false,
       code: CODE.BIOMETRIC_FAILED,
@@ -240,21 +254,11 @@ async function requestBiometricGateViaAppTab() {
     };
   }
 
-  const originalTab = await getActiveTab();
-
-  try {
-    if (appTab.windowId) {
-      await chrome.windows.update(appTab.windowId, { focused: true });
-    }
-    await chrome.tabs.update(appTab.id, { active: true });
-  } catch {
-    // non-fatal; continue
-  }
-
   const biometricMessage = { type: "CYBERHYGIENE_BIOMETRIC_GATE" };
 
   const parseResult = async (response) => {
     if (!response || !response.ok) {
+      clearBiometricUnlock();
       return {
         ok: false,
         code: CODE.BIOMETRIC_FAILED,
@@ -267,49 +271,76 @@ async function requestBiometricGateViaAppTab() {
       await setToken(newToken);
     }
 
+    setBiometricUnlock(targetContext.tabId, targetContext.domain);
     return { ok: true, code: CODE.OK };
   };
 
-  let result;
-  try {
-    const response = await sendMessageToTab(appTab.id, biometricMessage);
-    result = await parseResult(response);
-  } catch {
+  const runBiometricRequest = async () => {
     try {
-      await ensureContentScript(appTab.id);
       const response = await sendMessageToTab(appTab.id, biometricMessage);
-      result = await parseResult(response);
+      return parseResult(response);
     } catch {
-      result = {
-        ok: false,
-        code: CODE.BIOMETRIC_FAILED,
-        message: "Unable to start biometric verification."
-      };
+      try {
+        await ensureContentScript(appTab.id);
+        const response = await sendMessageToTab(appTab.id, biometricMessage);
+        return parseResult(response);
+      } catch {
+        return {
+          ok: false,
+          code: CODE.BIOMETRIC_FAILED,
+          message: "Unable to start biometric verification."
+        };
+      }
+    }
+  };
+
+  // First attempt without switching tabs; if browser blocks it, fallback to focused app tab.
+  let result = await runBiometricRequest();
+
+  if (!result.ok) {
+    const originalTab = await getActiveTab();
+    let switched = false;
+
+    try {
+      if (appTab.windowId) {
+        await chrome.windows.update(appTab.windowId, { focused: true });
+      }
+      await chrome.tabs.update(appTab.id, { active: true });
+      switched = true;
+    } catch {
+      switched = false;
+    }
+
+    result = await runBiometricRequest();
+
+    if (switched) {
+      try {
+        if (originalTab && originalTab.id) {
+          if (originalTab.windowId) {
+            await chrome.windows.update(originalTab.windowId, { focused: true });
+          }
+          await chrome.tabs.update(originalTab.id, { active: true });
+        }
+      } catch {
+        // non-fatal
+      }
     }
   }
 
-  try {
-    if (originalTab && originalTab.id) {
-      if (originalTab.windowId) {
-        await chrome.windows.update(originalTab.windowId, { focused: true });
-      }
-      await chrome.tabs.update(originalTab.id, { active: true });
-    }
-  } catch {
-    // non-fatal
+  if (!result || !result.ok) {
+    clearBiometricUnlock();
   }
 
   return result;
 }
 
 
-async function getActiveContext() {
-  const tab = await getActiveTab();
+async function getContextFromTab(tab, emptyMessage = "No active tab.") {
   if (!tab || !tab.id || !tab.url) {
     return {
       ok: false,
       code: CODE.UNSUPPORTED_PAGE,
-      message: "No active tab."
+      message: emptyMessage
     };
   }
 
@@ -351,6 +382,98 @@ async function getActiveContext() {
     domain,
     blocked
   };
+}
+
+async function getActiveContext() {
+  const tab = await getActiveTab();
+  return getContextFromTab(tab, "No active tab.");
+}
+
+async function getContextByTabId(tabId) {
+  const parsed = Number(tabId);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return {
+      ok: false,
+      code: CODE.UNSUPPORTED_PAGE,
+      message: "Invalid target tab."
+    };
+  }
+
+  try {
+    const tab = await chrome.tabs.get(parsed);
+    return getContextFromTab(tab, "Target tab is not available.");
+  } catch {
+    return {
+      ok: false,
+      code: CODE.UNSUPPORTED_PAGE,
+      message: "Target tab is not available."
+    };
+  }
+}
+
+async function getContextForRequest(message) {
+  const requestedTabId = Number(message && message.tabId);
+  const requestedDomain = getBaseDomain(message && message.domain);
+
+  if (Number.isInteger(requestedTabId) && requestedTabId > 0) {
+    const context = await getContextByTabId(requestedTabId);
+    if (!context.ok) return context;
+
+    if (requestedDomain && context.domain !== requestedDomain) {
+      return {
+        ok: false,
+        code: CODE.DOMAIN_MISMATCH,
+        message: "Active site changed. Open the target login tab and retry."
+      };
+    }
+
+    return context;
+  }
+
+  const activeContext = await getActiveContext();
+  if (!activeContext.ok) return activeContext;
+
+  if (requestedDomain && activeContext.domain !== requestedDomain) {
+    return {
+      ok: false,
+      code: CODE.DOMAIN_MISMATCH,
+      message: "Active site changed. Open the target login tab and retry."
+    };
+  }
+
+  return activeContext;
+}
+
+function clearBiometricUnlock() {
+  biometricUnlock = {
+    tabId: null,
+    domain: "",
+    expiresAt: 0
+  };
+}
+
+function setBiometricUnlock(tabId, domain) {
+  const normalizedDomain = getBaseDomain(domain);
+  if (!tabId || !normalizedDomain) {
+    clearBiometricUnlock();
+    return;
+  }
+
+  biometricUnlock = {
+    tabId,
+    domain: normalizedDomain,
+    expiresAt: Date.now() + CONFIG.BIOMETRIC_UNLOCK_TTL_MS
+  };
+}
+
+function hasValidBiometricUnlock(context) {
+  if (!context || !context.ok) return false;
+  if (!biometricUnlock || !biometricUnlock.tabId || !biometricUnlock.domain) return false;
+  if (Date.now() > biometricUnlock.expiresAt) return false;
+  return (
+    biometricUnlock.tabId === context.tabId &&
+    biometricUnlock.domain === context.domain
+  );
 }
 
 function firstNonEmptyString(...values) {
@@ -953,30 +1076,7 @@ async function handlePerformAutofill(message) {
     };
   }
 
-  const token = await getToken();
-  if (!token) {
-    return {
-      ok: false,
-      code: CODE.NO_TOKEN,
-      message: "Please login to Cyber Hygiene."
-    };
-  }
-
-  if (isJwtExpired(token)) {
-    await clearToken();
-    return {
-      ok: false,
-      code: CODE.UNAUTHORIZED,
-      message: "Session expired. Please login again."
-    };
-  }
-
-  const biometric = await requestBiometricGateViaAppTab();
-  if (!biometric.ok) {
-    return biometric;
-  }
-
-  const context = await getActiveContext();
+  const context = await getContextForRequest(message);
   if (!context.ok) return context;
 
   if (context.blocked) {
@@ -987,10 +1087,49 @@ async function handlePerformAutofill(message) {
     };
   }
 
-  const vault = await fetchVaultCredentials(context.domain, token);
+  if (!hasValidBiometricUnlock(context)) {
+    const biometric = await requestBiometricGateViaAppTab({
+      tabId: context.tabId,
+      domain: context.domain
+    });
+    if (!biometric.ok) {
+      return biometric;
+    }
+  }
+
+  if (!hasValidBiometricUnlock(context)) {
+    return {
+      ok: false,
+      code: CODE.BIOMETRIC_FAILED,
+      message: "Fingerprint verification required before autofill."
+    };
+  }
+
+  const activeToken = await getToken();
+  if (!activeToken) {
+    clearBiometricUnlock();
+    return {
+      ok: false,
+      code: CODE.NO_TOKEN,
+      message: "Please login to Cyber Hygiene."
+    };
+  }
+
+  if (isJwtExpired(activeToken)) {
+    await clearToken();
+    clearBiometricUnlock();
+    return {
+      ok: false,
+      code: CODE.UNAUTHORIZED,
+      message: "Session expired. Please login again."
+    };
+  }
+
+  const vault = await fetchVaultCredentials(context.domain, activeToken);
   if (!vault.ok) {
     if (vault.code === CODE.UNAUTHORIZED) {
       await clearToken();
+      clearBiometricUnlock();
     }
     return vault;
   }
@@ -1013,6 +1152,9 @@ async function handlePerformAutofill(message) {
   }
 
   const fillResult = await autofillInTab(context.tabId, context.domain, selected);
+  if (fillResult && fillResult.ok) {
+    clearBiometricUnlock();
+  }
   return fillResult;
 }
 
@@ -1042,7 +1184,7 @@ async function handleMessage(message) {
     }
 
     case MESSAGE.REQUEST_BIOMETRIC_GATE: {
-      return requestBiometricGateViaAppTab();
+      return requestBiometricGateViaAppTab(message);
     }
 
     case MESSAGE.FETCH_VAULT_FOR_ACTIVE_TAB: {
@@ -1114,6 +1256,7 @@ async function handleMessage(message) {
 
     case MESSAGE.CLEAR_TOKEN: {
       await clearToken();
+      clearBiometricUnlock();
       return { ok: true, code: CODE.OK };
     }
 

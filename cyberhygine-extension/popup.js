@@ -3,6 +3,7 @@
   GET_AUTH_STATUS: "GET_AUTH_STATUS",
   OPEN_LOGIN: "OPEN_LOGIN",
   SYNC_TOKEN_FROM_APP: "SYNC_TOKEN_FROM_APP",
+  REQUEST_BIOMETRIC_GATE: "REQUEST_BIOMETRIC_GATE",
   FETCH_VAULT_FOR_ACTIVE_TAB: "FETCH_VAULT_FOR_ACTIVE_TAB",
   PERFORM_AUTOFILL: "PERFORM_AUTOFILL",
   CAPTURE_LOGIN_CREDENTIAL: "CAPTURE_LOGIN_CREDENTIAL",
@@ -30,6 +31,7 @@ const CONFIG = Object.freeze({
 });
 
 const state = {
+  tabId: null,
   domain: "",
   blocked: false,
   authorized: false,
@@ -375,6 +377,7 @@ async function loadPopupData() {
     const context = await sendMessage({ type: MESSAGE.GET_ACTIVE_CONTEXT });
 
     if (!context.ok) {
+      state.tabId = null;
       state.domain = "";
       state.blocked = false;
       el.domainValue.textContent = "-";
@@ -384,6 +387,7 @@ async function loadPopupData() {
       return;
     }
 
+    state.tabId = Number(context.tabId) || null;
     state.domain = context.domain || "";
     state.blocked = Boolean(context.blocked);
     el.domainValue.textContent = state.domain || "-";
@@ -508,7 +512,9 @@ async function onAutofillClick() {
   try {
     const result = await sendMessage({
       type: MESSAGE.PERFORM_AUTOFILL,
-      credentialId
+      credentialId,
+      tabId: state.tabId,
+      domain: state.domain
     });
 
     if (!result.ok) {
